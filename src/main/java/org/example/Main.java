@@ -9,15 +9,18 @@ public class Main {
     public static void main(String[] args) {
         System.out.println("Starting Excel Processing...");
 
-        String filePath = "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\test_data.xlsx";
+        String staticFilePath= "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\RCPLNP01.xlsx";
+        String dynamicFilePath = "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\example.xlsx";
         String outputFilePath = "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\out_data.xlsx";
         String flagColumn = "Flag"; // The column that determines if updates are needed
 
-        try (FileInputStream fis = new FileInputStream(filePath);
-             Workbook workbook = new XSSFWorkbook(fis)) {
+        try (FileInputStream fisStatic = new FileInputStream(staticFilePath);
+             FileInputStream fisDynamic = new FileInputStream(dynamicFilePath);
+             Workbook workbookStatic = new XSSFWorkbook(fisStatic);
+             Workbook workbookDynamic= new XSSFWorkbook(fisDynamic)) {
 
-            Sheet staticSheet = workbook.getSheetAt(0); // Sheet 1 (Reference)
-            Sheet dynamicSheet = workbook.getSheetAt(1); // Sheet 2 (To be updated)
+            Sheet staticSheet = workbookStatic.getSheetAt(0); // Sheet 1 (Reference)
+            Sheet dynamicSheet = workbookDynamic.getSheet("000A"); // Sheet 2 (To be updated)
 
             // Get column headers for both sheets
             List<String> headerStaticSheet = getColumnHeaders(staticSheet);
@@ -70,7 +73,7 @@ public class Main {
 
             // Save the updated Sheet 2 back to an Excel file
             try (FileOutputStream fos = new FileOutputStream(outputFilePath)) {
-                workbook.write(fos);
+                workbookDynamic.write(fos);
             }
 
             System.out.println("Dynamic Sheet updated successfully!");
