@@ -9,32 +9,35 @@ public class Main {
     public static void main(String[] args) {
         System.out.println("Starting Excel Processing...");
 
-        String staticFilePath= "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\RCPLNP01.xlsx";
+        String staticFilePath = "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\RCPLNP01.xlsx";
         String dynamicFilePath = "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\example.xlsx";
         String outputFilePath = "C:\\Users\\ibattula\\IdeaProjects\\TyageshProject\\src\\main\\java\\org\\example\\out_data.xlsx";
-        String flagColumn = "Flag"; // The column that determines if updates are needed
+        String flagColumn = "Flag"; // Column that determines if updates are needed
 
         try (FileInputStream fisStatic = new FileInputStream(staticFilePath);
              FileInputStream fisDynamic = new FileInputStream(dynamicFilePath);
              Workbook workbookStatic = new XSSFWorkbook(fisStatic);
-             Workbook workbookDynamic= new XSSFWorkbook(fisDynamic)) {
+             Workbook workbookDynamic = new XSSFWorkbook(fisDynamic)) {
 
-            Sheet staticSheet = workbookStatic.getSheetAt(0); // Sheet 1 (Reference)
-            Sheet dynamicSheet = workbookDynamic.getSheet("000A"); // Sheet 2 (To be updated)
+            Sheet staticSheet = workbookStatic.getSheetAt(0); // Reference Sheet
+            Sheet dynamicSheet = workbookDynamic.getSheet("000A"); // Sheet to update
 
-            // Get column headers for both sheets
-            List<String> headerStaticSheet = getColumnHeaders(staticSheet);
-            List<String> headerDynamicSheet = getColumnHeaders(dynamicSheet);
+            // Get column headers from correct rows
+            List<String> headerStaticSheet = getColumnHeaders(staticSheet, 0); // 1st row in Excel
+            List<String> headerDynamicSheet = getColumnHeaders(dynamicSheet, 3); // 4th row in Excel
 
-            // Find common columns between both sheets
+            System.out.println("Static Headers: " + headerStaticSheet);
+            System.out.println("Dynamic Headers: " + headerDynamicSheet);
+
+            // Find common columns
             Set<String> commonColumns = new HashSet<>(headerStaticSheet);
             commonColumns.retainAll(headerDynamicSheet);
 
-            // Get column index mappings for both sheets
-            Map<String, Integer> indexMapStatic = getColumnIndexMap(staticSheet);
-            Map<String, Integer> indexMapDynamic = getColumnIndexMap(dynamicSheet);
+            // Get column indexes from correct rows
+            Map<String, Integer> indexMapStatic = getColumnIndexMap(staticSheet, 0);
+            Map<String, Integer> indexMapDynamic = getColumnIndexMap(dynamicSheet, 3);
 
-            // Validate if flag column exists in Sheet 2
+            // Ensure flag column exists in Sheet 2
             if (!indexMapDynamic.containsKey(flagColumn)) {
                 System.err.println("Error: Flag column '" + flagColumn + "' not found in Sheet 2.");
                 return;
@@ -42,18 +45,18 @@ public class Main {
             int flagColumnIndex = indexMapDynamic.get(flagColumn);
 
             // Process Sheet 2 rows for updating common columns
-            for (int i = 1; i < dynamicSheet.getPhysicalNumberOfRows(); i++) {
+            for (int i = 4; i < dynamicSheet.getPhysicalNumberOfRows(); i++) { // Start from 5th row
                 Row rowDynamic = dynamicSheet.getRow(i);
-                Row rowStatic = staticSheet.getRow(i); // Match row with the same index
+                Row rowStatic = staticSheet.getRow(i - 3); // Adjust row index for staticSheet
 
                 if (rowDynamic == null || rowStatic == null) {
                     continue; // Skip empty rows
                 }
 
-                // Get flag column value in Sheet 2
+                // Check if flag column is "Y"
                 Cell flagCell = rowDynamic.getCell(flagColumnIndex);
                 if (flagCell != null && "Y".equalsIgnoreCase(flagCell.getStringCellValue().trim())) {
-                    // Update all common columns from Sheet 1 to Sheet 2
+                    // Update common column values
                     for (String column : commonColumns) {
                         int indexStatic = indexMapStatic.get(column);
                         int indexDynamic = indexMapDynamic.get(column);
@@ -63,7 +66,7 @@ public class Main {
 
                         if (cellStatic != null) {
                             if (cellDynamic == null) {
-                                cellDynamic = rowDynamic.createCell(indexDynamic); // Create cell if missing
+                                cellDynamic = rowDynamic.createCell(indexDynamic);
                             }
                             cellDynamic.setCellValue(cellStatic.toString()); // Copy value from Sheet 1
                         }
@@ -71,7 +74,7 @@ public class Main {
                 }
             }
 
-            // Save the updated Sheet 2 back to an Excel file
+            // Save updated data to output file
             try (FileOutputStream fos = new FileOutputStream(outputFilePath)) {
                 workbookDynamic.write(fos);
             }
@@ -84,25 +87,31 @@ public class Main {
     }
 
     /**
-     * Retrieves a map of column names to their index positions.
+     * Retrieves a map of column names to their index positions from the given header row.
      */
-    private static Map<String, Integer> getColumnIndexMap(Sheet sheet) {
+    private static Map<String, Integer> getColumnIndexMap(Sheet sheet, int headerRowNum) {
         Map<String, Integer> indexMap = new HashMap<>();
-        Row headerRow = sheet.getRow(0);
+        Row headerRow = sheet.getRow(headerRowNum);
         if (headerRow != null) {
-            for (int i = 0; i < headerRow.getPhysicalNumberOfCells(); i++) {
-                indexMap.put(headerRow.getCell(i).getStringCellValue().trim(), i);
+            for (int i = 0; i < headerRow.getLastCellNum(); i++) { // Use getLastCellNum() instead of getPhysicalNumberOfCells()
+                Cell cell = headerRow.getCell(i);
+                if (cell != null && cell.getCellType() == CellType.STRING) { // Check if cell is not null and is a string
+                    String header = cell.getStringCellValue().trim();
+                    if (!header.isEmpty()) { // Ignore empty headers
+                        indexMap.put(header, i);
+                    }
+                }
             }
         }
         return indexMap;
     }
 
     /**
-     * Retrieves a list of column headers from the sheet.
+     * Retrieves a list of column headers from the specified row.
      */
-    public static List<String> getColumnHeaders(Sheet sheet) {
+    public static List<String> getColumnHeaders(Sheet sheet, int rowNum) {
         List<String> headers = new ArrayList<>();
-        Row headerRow = sheet.getRow(0);
+        Row headerRow = sheet.getRow(rowNum);
         if (headerRow != null) {
             for (Cell cell : headerRow) {
                 headers.add(cell.getStringCellValue().trim());
